@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Expense Tracker</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <nav>
+        <button onclick="showSection('expensesSection')">Expenses</button>
+        <button onclick="showSection('addSection')">Add New Expense</button>
+    </nav>
+
+    <div id="budgetPrompt" class="section">
+        <h2>Enter your total budget for the month:</h2>
+        <input id="totalBudgetInput" type="number" placeholder="Enter total budget" />
+        <br><br>
+        <button onclick="saveTotalBudget()">Submit</button>
+    </div>
+
+    <div id="expensesSection" class="section" style="display: none;">
+        <h2>All Expenses</h2>
+        <table id="expenseTable">
+            <thead>
+                <tr>
+                    <th>Description</th>
+                    <th>Category</th>
+                    <th>Amount (₹)</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+        <p id="remainingBudget"></p>
+    </div>
+
+    <div id="addSection" class="section" style="display: none;">
+        <h2>Add New Expense</h2>
+        <input id="desc" placeholder="Description"><br>
+        <select id="category">
+            <option>Food</option>
+            <option>Transport</option>
+            <option>Entertainment</option>
+            <option>Utilities</option>
+            <option>Others</option>
+        </select><br>
+        <input type="number" id="amount" placeholder="Amount"><br>
+        <button onclick="addExpense()">Add Expense</button>
+        <p id="budgetStatus"></p>
+    </div>
+
+    <script>
+        let totalBudget = 0;
+
+        function showSection(id) {
+            document.querySelectorAll('.section').forEach(sec => sec.style.display = "none");
+            document.getElementById(id).style.display = "block";
+            if (id === "expensesSection") updateTable();
+        }
+
+        async function saveTotalBudget() {
+            totalBudget = parseFloat(document.getElementById("totalBudgetInput").value);
+            await fetch("/set_total_budget", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({ total_budget: totalBudget })
+            });
+            document.getElementById("budgetPrompt").style.display = "none";
+            document.getElementById("expensesSection").style.display = "block";
+            updateTable();
+        }
+
+        async function addExpense() {
+            const desc = document.getElementById("desc").value;
+            const category = document.getElementById("category").value;
+            const amount = parseFloat(document.getElementById("amount").value);
+
+            await fetch("/add_expense", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({ desc, category, amount })
+            });
+
+            document.getElementById("desc").value = "";
+            document.getElementById("amount").value = "";
+
+            updateTable();
+        }
+        async function submitExpense(e) {
+            e.preventDefault();
+
+            const desc = document.getElementById("desc").value.trim();
+            const category = document.getElementById("category").value;
+            const amount = parseFloat(document.getElementById("amount").value);
+
+            if (!desc || !category || isNaN(amount)) {
+                alert("Please fill out all fields correctly.");
+                return;
+            }
+
+            const res = await fetch("/add_expense", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ desc, category, amount })
+            });
+
+            const result = await res.json();
+            console.log(result); // Debug log
+
+            if (res.ok) {
+                alert("Expense added!");
+                document.getElementById("desc").value = "";
+                document.getElementById("amount").value = "";
+                updateTable();
+            } else {
+                alert("Failed to add expense.");
+            }
+        }
+
+
+        async function updateTable() {
+            const res = await fetch("/get_data");
+            const data = await res.json();
+            const tableBody = document.querySelector("#expenseTable tbody");
+            tableBody.innerHTML = "";
+
+            let totalSpent = 0;
+
+            data.expenses.forEach(exp => {
+                totalSpent += exp.amount;
+                const row = `<tr>
+                                <td>${exp.desc}</td>
+                                <td>${exp.category}</td>
+                                <td>₹${exp.amount.toFixed(2)}</td>
+                            </tr>`;
+                tableBody.innerHTML += row;
+            });
+
+            const remaining = data.total_budget - totalSpent;
+            document.getElementById("remainingBudget").innerHTML = 
+                `<strong>Remaining Budget:</strong> ₹${remaining.toFixed(2)}`;
+
+            if (remaining < 0) {
+                document.getElementById("remainingBudget").style.color = "red";
+            } else {
+                document.getElementById("remainingBudget").style.color = "green";
+            }
+        }
+
+        window.onload = async function() {
+            const res = await fetch("/get_data");
+            const data = await res.json();
+            if (data.total_budget > 0) {
+                document.getElementById("budgetPrompt").style.display = "none";
+                document.getElementById("expensesSection").style.display = "block";
+                updateTable();
+            }
+        };
+    </script>
+</body>
+</html>
