@@ -142,6 +142,7 @@
                 `<strong>Remaining Budget:</strong> ₹${remaining.toFixed(2)}`;
 
             if (remaining < 0) {
+                alert('Budget exceeded');
                 document.getElementById("remainingBudget").style.color = "red";
             } else {
                 document.getElementById("remainingBudget").style.color = "green";
